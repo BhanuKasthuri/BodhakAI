@@ -89,6 +89,19 @@ EOF
 print_status ".env created."
 
 print_info "Configuring nginx..."
+
+# Ensure nginx config directories exist
+print_info "Checking and creating Nginx configuration directories if needed..."
+if [ ! -d "/etc/nginx/sites-available" ]; then
+  sudo mkdir -p /etc/nginx/sites-available
+  print_status "/etc/nginx/sites-available created."
+fi
+
+if [ ! -d "/etc/nginx/sites-enabled" ]; then
+  sudo mkdir -p /etc/nginx/sites-enabled
+  print_status "/etc/nginx/sites-enabled created."
+fi
+
 sudo tee /etc/nginx/sites-available/bodhakai.com >/dev/null <<EOL
 server {
     listen 80;
