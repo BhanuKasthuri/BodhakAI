@@ -1,9 +1,9 @@
 #!/bin/bash
-# Bodhak AI - Ultra-Budget Deployment Script for user 'bhanu'
+# Bodhak AI deployment with HuggingFace local LLM support for user 'bhanu'.
 
 set -e
 
-echo "🚀 Starting Bodhak AI Ultra-Budget Deployment.!!!"
+echo "🚀 Starting HuggingFace LLM based BodhAK AI deployment.!!"
 echo ""
 
 RED='\033[0;31m'
@@ -25,13 +25,13 @@ print_info "Updating system packages..."
 sudo apt update && sudo apt upgrade -y
 
 print_info "Installing base dependencies..."
-sudo apt install -y software-properties-common curl unzip wget
+sudo apt install -y software-properties-common curl wget unzip build-essential libssl-dev libcurl4-openssl-dev libbz2-dev liblzma-dev zlib1g-dev
 
-print_info "Adding deadsnakes PPA..."
+print_info "Adding deadsnakes PPA for Python versions..."
 sudo add-apt-repository -y ppa:deadsnakes/ppa
 sudo apt update
 
-print_info "Installing Python 3.11 and required packages..."
+print_info "Installing Python 3.11, venv and build dependencies..."
 sudo apt install -y python3.11 python3.11-venv python3.11-distutils
 
 print_info "Installing pip for Python 3.11..."
@@ -40,53 +40,43 @@ sudo python3.11 get-pip.py
 rm get-pip.py
 print_status "Python 3.11 and pip installed."
 
-print_info "Creating user directories..."
-mkdir -p ~/bodhak-ai/{backend,frontend,logs,cache,uploads}
+print_info "Setting up application directories..."
+mkdir -p ~/bodhak-ai/{backend,frontend,logs,uploads,cache}
 print_status "Directories created."
 
-print_info "Setting up Python virtual environment..."
+print_info "Creating Python virtual environment..."
 python3.11 -m venv ~/bodhak-ai/venv
 source ~/bodhak-ai/venv/bin/activate
 print_status "Virtual environment created."
 
-print_info "Checking Ollama CLI installation..."
-if ! command -v ollama &>/dev/null; then
-  print_info "Ollama CLI not found. Installing..."
-  curl -fsSL https://ollama.ai/install | bash
-  export PATH="$HOME/.ollama/bin:$PATH"
-  echo 'export PATH="$HOME/.ollama/bin:$PATH"' >> ~/.bashrc
-  print_status "Ollama CLI installed."
-else
-  print_status "Ollama CLI already installed."
-fi
+print_info "Generating requirements.txt..."
+cat > ~/bodhak-ai/requirements.txt <<EOF
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+transformers==4.33.2
+torch==2.0.1
+sentence-transformers==2.2.2
+numpy==1.26.1
+pandas==2.0.2
+aiofiles==23.1.0
+python-multipart==0.0.6
+python-dotenv==1.0
+requests==2.31.0
+EOF
 
-# Reload bash config for path changes
-source ~/.bashrc || true
-
-print_info "Ensuring Ollama CLI is ready..."
-if command -v ollama &>/dev/null; then
-  if ! ollama list | grep -q 'mistral:7b'; then
-    ollama pull mistral:7b
-    print_status "Mistral 7b model downloaded."
-  else
-    print_status "Mistral 7b model already present."
-  fi
-else
-  print_error "Ollama CLI failed to install or not found in PATH."
-  print_error "Please verify installation manually and re-run the script."
-  exit 1
-fi
+print_info "Installing Python dependencies..."
+pip install --upgrade pip
+pip install -r ~/bodhak-ai/requirements.txt
+print_status "Python dependencies installed."
 
 print_info "Creating environment configuration..."
 cat > ~/bodhak-ai/.env <<EOF
-# Bodhak AI configuration
-
 OPENAI_API_KEY=
 OPENAI_ORG_ID=
 
 DATABASE_URL=sqlite:///\$HOME/bodhak-ai/bodhak_ai.db
 
-SECRET_KEY=$(openssl rand -hex 32)
+SECRET_KEY=\$(openssl rand -hex 32)
 ALLOWED_ORIGINS=https://www.bodhakai.com,https://bodakai.com,http://localhost:8000
 
 DAILY_API_LIMIT=1000
@@ -96,29 +86,10 @@ PREMIUM_QUERIES=200
 
 CACHE_TTL=168
 EOF
-print_status "Environment file created."
-
-print_info "Generating minimal requirements file..."
-cat > ~/bodhak-ai/requirements.txt <<EOF
-fastapi==0.104.1
-uvicorn[standard]==0.24.0
-pydantic==0.39.2
-aiofiles==0.9.1
-python-dotenv==0.21.0
-requests==2.28.1
-numpy==1.22.4
-pandas==1.4.1
-sentence-transformers==2.2.0
-python-multipart==0.0.5
-EOF
-
-print_info "Installing Python dependencies..."
-pip install --upgrade pip
-pip install -r ~/bodhak-ai/requirements.txt
-print_status "Python dependencies installed."
+print_status ".env created."
 
 print_info "Configuring nginx..."
-sudo tee /etc/nginx/sites-available/bodakai.com > /dev/null <<EOL
+sudo tee /etc/nginx/sites-available/bodhakai.com >/dev/null <<EOL
 server {
     listen 80;
     server_name www.bodhakai.com bodakai.com;
@@ -127,30 +98,23 @@ server {
     add_header X-Content-Type-Options nosniff;
     add_header X-XSS-Protection "1; mode=block";
 
-    limit_req_zone \$binary_remote_addr zone=api:10m rate=5r/s;
-    limit_req_zone \$binary_remote_addr zone=upload:10m rate=1r/s;
-
     location / {
         root /home/bhaki-ai/../frontend;
         index index.html;
         try_files \$uri \$uri/ /index.html;
 
-        location ~* \\\.(css|js|png|jpg|jpeg|gif|ico|svg)$ {
+        location ~* \\\\.\\\\(css|js|png|jpg|jpeg|gif|ico|svg)\\\$ {
             expires 1y;
             add_header Cache-Control "public, immutable";
         }
     }
 
     location /api/ {
-        limit_req zone=api burst=10 nodelay;
         proxy_pass http://127.0.0.1:8000;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto \$scheme;
-        proxy_connect_timeout 30s;
-        proxy_send_timeout 30s;
-        proxy_read_timeout 30s;
     }
 
     location /health {
@@ -160,16 +124,15 @@ server {
 }
 EOL
 
-sudo ln -sf /etc/nginx/sites-available/bodakai.com /etc/nginx/sites-enabled/
+sudo ln -sf /etc/nginx/sites-available/bodhakai.com /etc/nginx/sites-enabled/
 sudo rm -f /etc/nginx/sites-enabled/default
-
 nginx -t && sudo systemctl restart nginx
-print_status "nginx configured and restarted."
+print_status "nginx configured/restarted."
 
-print_info "Setting up systemd service..."
-sudo tee /etc/systemd/system/bodhak-ai.service > /dev/null << EOL
+print_info "Creating systemd service for BodhAK AI..."
+sudo tee /etc/systemd/system/bodhak-ai.service >/dev/null <<EOL
 [Unit]
-Description=Bodhak AI backend
+Description=BodhAK AI Backend Service
 After=network.target
 
 [Service]
@@ -195,8 +158,8 @@ sudo ufw allow 'Nginx Full'
 sudo ufw --force enable
 print_status "Firewall configured."
 
-print_info "Setting up log rotation..."
-sudo tee /etc/logrotate.d/bodhak-ai > /dev/null << EOL
+print_info "Setting up logrotate..."
+sudo tee /etc/logrotate.d/bodhak-ai >/dev/null <<EOL
 /home/bhaki-ai/logs/*.log {
     daily
     rotate 7
@@ -207,40 +170,31 @@ sudo tee /etc/logrotate.d/bodhak-ai > /dev/null << EOL
 }
 EOL
 
-print_status "Log rotation configured."
+print_status "Logrotate configured."
 
-print_info "Creating sample frontend page..."
-cat > ~/bodhak-ai/frontend/index.html << EOF
+print_info "Creating frontend placeholder..."
+cat > ~/bodhak-ai/frontend/index.html <<EOF
 <!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Bodhak AI - Coming Soon</title>
-    <style>
-        body { background: #0f172a; color: white; font-family: Arial, sans-serif; padding: 50px; }
-        .container { max-width: 600px; margin: auto; text-align: center; }
-        h1 { font-size: 3rem; color: #0ea0e1; }
-        p { font-size: 1.2rem; }
-        .box { background: #1e293b; padding: 40px; border-radius: 12px; margin-top: 30px; }
-    </style>
-</head>
+<html>
+<head><title>BodhAK AI Launching</title>
+<style>
+body {background:#0b1120; color:#e0e6f1;
+font-family: Arial, sans-serif; text-align:center; padding:40px;}
+h1 {font-size:3rem; color:#4ca0d3;}
+.box {background:#192a46; padding:30px; border-radius:12px; max-width:600px; margin:5% auto;}
+</style></head>
 <body>
-<div class="container">
-  <h1>🧠 Bodhak AI</h1>
-  <div class="box">
-    <p>Preparing your AI-powered NEET & JEE platform.</p>
-    <p>Access will be live at www.bodhakai.com soon.</p>
-  </div>
+<div class="box">
+<h1>BodhAK AI is Preparing Your Learning Experience</h1>
+<p>Soon accessible at <strong>www.bodhakai.com</strong></p>
 </div>
 </body>
 </html>
 EOF
-print_status "Sample frontend page created."
+print_status "Frontend placeholder created."
 
-echo ""
-echo "🎉 Deployment complete!"
-echo "Visit https://www.bodhakai.com after DNS setup."
-echo "Manage backend: sudo systemctl {start|stop|restart|status} bodhak-ai"
+echo
+echo "Deployment Completed! Check http://localhost or your domain when DNS propagates."
+echo "Manage service: sudo systemctl {start,stop,restart,status} bodhak-ai"
 echo "View logs: sudo journalctl -u bodhak-ai -f"
-echo ""
+echo
