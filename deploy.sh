@@ -167,12 +167,9 @@ print_status "bodhak-ai service started."
 
 print_info "Setting up firewall..."
 sudo ufw allow OpenSSH
-if sudo ufw app list | grep -q 'Nginx Full'; then
-  sudo ufw allow 'Nginx Full'
-else
-  sudo ufw allow 80/tcp
-  sudo ufw allow 443/tcp
-fi
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+
 
 sudo ufw --force enable
 print_status "Firewall configured."
