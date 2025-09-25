@@ -55,24 +55,23 @@ python3.11 -m venv ~/bodhak-ai/venv
 source ~/bodhak-ai/venv/bin/activate
 print_status "Virtual environment created."
 
-# Install Ollama locally (no sudo)
 if ! command -v ollama &> /dev/null; then
-  print_info "Installing Ollama CLI (local AI)..."
   curl -fsSL https://ollama.ai/install | bash
-  export PATH="$HOME/.ollama/bin:$PATH"
+  echo 'export PATH="$HOME/.ollama/bin:$PATH"' >> ~/.bashrc
+  source ~/.bashrc
   print_status "Ollama installed."
 else
-  print_status "Ollama CLI already installed."
+  print_status "Ollama already installed."
 fi
 
-# Pull Mistral 7b model with user permissions (no sudo)
-if ! ollama list | grep -q 'mistral:7b'; then
+if ! ~/.ollama/bin/ollama list | grep -q 'mistral:7b'; then
   print_info "Downloading Mistral 7b model (this may take some time)..."
-  ollama pull mistral:7b
+  ~/.ollama/bin/ollama pull mistral:7b
   print_status "Mistral model downloaded."
 else
   print_status "Mistral model already downloaded."
 fi
+
 
 # Creating environment config file with proper permissions
 print_info "Generating environment configuration file..."
