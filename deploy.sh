@@ -3,7 +3,7 @@
 
 set -e
 
-echo "🚀 Starting HuggingFace LLM based BodhAK AI deployment.!!"
+echo "🚀 !!Starting HuggingFace LLM based BodhAK AI deployment.!!"
 echo ""
 
 RED='\033[0;31m'
