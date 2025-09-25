@@ -1,14 +1,14 @@
 #!/bin/bash
-# Bodhak AI deployment with HuggingFace local LLM support for user 'bhanu'.
+# Bodhak AI Ultra Budget Deployment Script for user 'bhanu' with HuggingFace LLM support
 
 set -e
 
-echo "🚀 !!Starting HuggingFace LLM based BodhAK AI deployment.!!"
+echo "🚀 Starting Bodhak AI Ultra-Budget Deployment..."
 echo ""
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
-YELLOW='\033[0;33m'
+YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
@@ -17,7 +17,7 @@ print_info() { echo -e "${BLUE}[ℹ]${NC} $1"; }
 print_error() { echo -e "${RED}[✗]${NC} $1"; }
 
 if [ "$USER" = "root" ]; then
-  print_error "Do not run this script as root. Switch to user 'bhanu' and run.";
+  print_error "Do not run this script as root. Switch to user 'bhanu' and run."
   exit 1
 fi
 
@@ -25,13 +25,13 @@ print_info "Updating system packages..."
 sudo apt update && sudo apt upgrade -y
 
 print_info "Installing base dependencies..."
-sudo apt install -y software-properties-common curl wget unzip build-essential libssl-dev libcurl4-openssl-dev libbz2-dev liblzma-dev zlib1g-dev
+sudo apt install -y software-properties-common curl wget unzip build-essential libssl-dev libcurl4-openssl-dev zlib1g-dev libbz2-dev liblzma-dev
 
-print_info "Adding deadsnakes PPA for Python versions..."
+print_info "Adding deadsnakes PPA..."
 sudo add-apt-repository -y ppa:deadsnakes/ppa
 sudo apt update
 
-print_info "Installing Python 3.11, venv and build dependencies..."
+print_info "Installing Python 3.11 and required packages..."
 sudo apt install -y python3.11 python3.11-venv python3.11-distutils
 
 print_info "Installing pip for Python 3.11..."
@@ -40,8 +40,8 @@ sudo python3.11 get-pip.py
 rm get-pip.py
 print_status "Python 3.11 and pip installed."
 
-print_info "Setting up application directories..."
-mkdir -p ~/bodhak-ai/{backend,frontend,logs,uploads,cache}
+print_info "Creating user directories..."
+mkdir -p ~/bodhak-ai/{backend,frontend,logs,cache,uploads}
 print_status "Directories created."
 
 print_info "Creating Python virtual environment..."
@@ -76,7 +76,7 @@ OPENAI_ORG_ID=
 
 DATABASE_URL=sqlite:///\$HOME/bodhak-ai/bodhak_ai.db
 
-SECRET_KEY=\$(openssl rand -hex 32)
+SECRET_KEY=$(openssl rand -hex 32)
 ALLOWED_ORIGINS=https://www.bodhakai.com,https://bodakai.com,http://localhost:8000
 
 DAILY_API_LIMIT=1000
@@ -88,20 +88,16 @@ CACHE_TTL=168
 EOF
 print_status ".env created."
 
-print_info "Configuring nginx..."
-
-# Ensure nginx config directories exist
-print_info "Checking and creating Nginx configuration directories if needed..."
+# Create nginx config dirs if missing
+print_info "Ensuring Nginx config directories exist..."
 if [ ! -d "/etc/nginx/sites-available" ]; then
-  sudo mkdir -p /etc/nginx/sites-available
-  print_status "/etc/nginx/sites-available created."
+  sudo mkdir -p /etc/nginx/sites-available && print_status "/etc/nginx/sites-available created."
 fi
-
 if [ ! -d "/etc/nginx/sites-enabled" ]; then
-  sudo mkdir -p /etc/nginx/sites-enabled
-  print_status "/etc/nginx/sites-enabled created."
+  sudo mkdir -p /etc/nginx/sites-enabled && print_status "/etc/nginx/sites-enabled created."
 fi
 
+print_info "Configuring nginx..."
 sudo tee /etc/nginx/sites-available/bodhakai.com >/dev/null <<EOL
 server {
     listen 80;
@@ -112,11 +108,11 @@ server {
     add_header X-XSS-Protection "1; mode=block";
 
     location / {
-        root /home/bhaki-ai/../frontend;
+        root /home/bhanu/bodhak-ai/frontend;
         index index.html;
         try_files \$uri \$uri/ /index.html;
 
-        location ~* \\\\.\\\\(css|js|png|jpg|jpeg|gif|ico|svg)\\\$ {
+        location ~* \\\\.(css|js|png|jpg|jpeg|gif|ico|svg)\$ {
             expires 1y;
             add_header Cache-Control "public, immutable";
         }
@@ -139,19 +135,20 @@ EOL
 
 sudo ln -sf /etc/nginx/sites-available/bodhakai.com /etc/nginx/sites-enabled/
 sudo rm -f /etc/nginx/sites-enabled/default
-nginx -t && sudo systemctl restart nginx
-print_status "nginx configured/restarted."
 
-print_info "Creating systemd service for BodhAK AI..."
+sudo nginx -t && sudo systemctl restart nginx
+print_status "nginx configured and restarted."
+
+print_info "Creating systemd service for Bodhak AI backend..."
 sudo tee /etc/systemd/system/bodhak-ai.service >/dev/null <<EOL
 [Unit]
-Description=BodhAK AI Backend Service
+Description=Bodhak AI Backend Service
 After=network.target
 
 [Service]
 User=bhanu
 WorkingDirectory=/home/bhanu/bodhak-ai/backend
-Environment=PATH=/home/bhanu/bodhak-ai/venv/bin
+Environment=PATH=/home/bhanu/bodhak-ai/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 ExecStart=/home/bhanu/bodhak-ai/venv/bin/python /home/bhanu/bodhak-ai/backend/bodhak_ai.py
 Restart=always
 RestartSec=10
@@ -163,20 +160,22 @@ EOL
 sudo systemctl daemon-reload
 sudo systemctl enable bodhak-ai
 sudo systemctl start bodhak-ai
-print_status "bodhak-ai service started."
+print_status "Bodhak AI backend service started."
 
-print_info "Setting up firewall..."
+print_info "Configuring firewall..."
 sudo ufw allow OpenSSH
-sudo ufw allow 80/tcp
-sudo ufw allow 443/tcp
-
-
+if sudo ufw app list | grep -q 'Nginx Full'; then
+  sudo ufw allow 'Nginx Full'
+else
+  sudo ufw allow 80/tcp
+  sudo ufw allow 443/tcp
+fi
 sudo ufw --force enable
 print_status "Firewall configured."
 
 print_info "Setting up logrotate..."
 sudo tee /etc/logrotate.d/bodhak-ai >/dev/null <<EOL
-/home/bhaki-ai/logs/*.log {
+/home/bhanu/bodhak-ai/logs/*.log {
     daily
     rotate 7
     copytruncate
@@ -188,29 +187,35 @@ EOL
 
 print_status "Logrotate configured."
 
-print_info "Creating frontend placeholder..."
+print_info "Creating sample frontend..."
 cat > ~/bodhak-ai/frontend/index.html <<EOF
 <!DOCTYPE html>
 <html>
-<head><title>BodhAK AI Launching</title>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Bodhak AI - Launching Soon</title>
 <style>
-body {background:#0b1120; color:#e0e6f1;
-font-family: Arial, sans-serif; text-align:center; padding:40px;}
-h1 {font-size:3rem; color:#4ca0d3;}
-.box {background:#192a46; padding:30px; border-radius:12px; max-width:600px; margin:5% auto;}
-</style></head>
+body {background:#0b1120;color:#e0e6f1;font-family:Arial,sans-serif;text-align:center;padding:40px;}
+h1 {font-size:3rem;color:#4ca0d3;}
+.box {background:#192a46;padding:30px;border-radius:12px;max-width:600px;margin:5% auto;}
+</style>
+</head>
 <body>
 <div class="box">
-<h1>BodhAK AI is Preparing Your Learning Experience</h1>
-<p>Soon accessible at <strong>www.bodhakai.com</strong></p>
+<h1>Bodhak AI is preparing your learning platform.</h1>
+<p>Access will be available at <strong>www.bodhakai.com</strong> soon.</p>
 </div>
 </body>
 </html>
 EOF
-print_status "Frontend placeholder created."
+print_status "Sample frontend created."
 
-echo
-echo "Deployment Completed! Check http://localhost or your domain when DNS propagates."
-echo "Manage service: sudo systemctl {start,stop,restart,status} bodhak-ai"
-echo "View logs: sudo journalctl -u bodhak-ai -f"
-echo
+echo ""
+echo "🎉 Deployment complete!"
+echo "Visit https://www.bodhakai.com when DNS propagates."
+echo "Manage backend service:"
+echo "  sudo systemctl start|stop|restart|status bodhak-ai"
+echo "View logs:"
+echo "  sudo journalctl -u bodhak-ai -f"
+echo ""
