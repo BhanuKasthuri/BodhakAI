@@ -1,0 +1,43 @@
+
+# AI-Based Educational Platform - Requirements
+
+# FastAPI and web framework
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+python-multipart==0.0.6
+aiofiles==23.2.1
+
+# AI and ML libraries
+openai==1.3.8
+sentence-transformers==2.2.2
+faiss-cpu==1.7.4
+torch==2.1.1
+numpy==1.24.3
+scikit-learn==1.3.2
+
+# Document processing
+PyPDF2==3.0.1
+python-docx==1.1.0
+langchain==0.0.350
+langchain-community==0.0.1
+
+# Data handling
+pandas==2.1.4
+sqlite3  # Built-in Python module
+
+# Web scraping and utilities
+requests==2.31.0
+beautifulsoup4==4.12.2
+
+# Environment and configuration
+python-dotenv==1.0.0
+pydantic==2.5.0
+pydantic-settings==2.1.0
+
+# Testing
+pytest==7.4.3
+pytest-asyncio==0.21.1
+httpx==0.25.2
+
+# Production deployment
+gunicorn==21.2.0
